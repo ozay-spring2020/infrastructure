@@ -28,7 +28,6 @@
             "Type": "Number",
             "MinValue": "5",
             "MaxValue": "1024",
-
             "ConstraintDescription": "must be between 20 and 65536 GiB."
         }
     },
@@ -82,7 +81,9 @@
                                             },
                                             "/*"
                                         ]
-                                    ]},{
+                                    ]
+                                },
+                                {
                                     "Fn::Join": [
                                         "",
                                         [
