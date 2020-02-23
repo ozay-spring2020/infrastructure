@@ -211,31 +211,20 @@
                 ],
                 "KeyName": "csye6225",
                 "UserData": {
-                    "Fn::Base64": {
-                        "Fn::Join": [
-                            "",
-                            [
-                                "#!/bin/bash\n",
-                                "sudo su\n",
-                                {
-                                    "Fn::GetAtt": [
-                                        "MyRDSDB",
-                                        "Endpoint.Address"
-                                    ]
-                                },
-                                " -Ddatabase=csye6225 -DsqlUsername=csye6225master -DsqlPassword=csye6225password",
-                                " -Dspring.bucket.name=",
-                                {
-                                    "Ref": "s3bucketName"
-                                },
-                                "\"\\\" >>/opt/tomcat/bin/setenv.sh\n",
-                                "echo \"export JAVA_OPTS\" >> /opt/tomcat/bin/setenv.sh\n",
-                                "sudo chmod +x /opt/tomcat/bin/setenv.sh\n",
-                                "sudo systemctl start tomcat"
-                            ]
-                        ]
+                    "Fn::Base64" : {
+                      "Fn::Join" : [ "", [
+                        "#cloud-boothook\n",
+                        "#!/bin/sh\n",
+                        "cd /etc/profile.d\n",
+                        "sudo touch custom.sh\n",
+                        "sudo echo export RDS_HOSTNAME=",{"Fn::GetAtt": ["RDS", "Endpoint.Address"]}," >> custom.sh\n",
+                        "sudo echo export RDS_USERNAME=csye6225master"," >> custom.sh\n",
+                        "sudo echo export RDS_PASSWORD=csye6225password"," >> custom.sh\n",
+                        "sudo echo export S3_BUCKET_ADDR=",{"Ref": "s3bucketName"}," >> custom.sh\n"
+                      ]
+                      ]
                     }
-                }
+                  }
             }
         },
         "WebServerSecurityGroup": {
