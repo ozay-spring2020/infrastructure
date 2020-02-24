@@ -6,13 +6,16 @@
             "Type": "String"
         },
         "AMI": {
+            "Description": "AMI Image ID.",
             "Type": "String"
         },
         "s3bucketName": {
+            "ConstraintDescription": "No Camelcase allowed",
             "Description": "s3bucketName for web",
             "Type": "String"
         },
         "VPCName": {
+            "Default": "Test",
             "Type": "String"
         },
         "EC2Size": {
@@ -45,8 +48,8 @@
                 "MasterUsername": "dbuser",
                 "MasterUserPassword": "dbpassword",
                 "Engine": "MySQL",
-                "EngineVersion": "5.6.35",
-                "DBName": "csye6225",
+                "EngineVersion": "5.7.28",
+                "DBName": "UserDB",
                 "DBSubnetGroupName": {
                     "Ref": "dbSubnetGroup"
                 },
@@ -67,7 +70,7 @@
                     "Statement": [
                         {
                             "Action": [
-                                "s3:PutObject"
+                                "s3:*"
                             ],
                             "Effect": "Allow",
                             "Resource": [
@@ -211,21 +214,67 @@
                 ],
                 "KeyName": "csye6225",
                 "UserData": {
-                    "Fn::Base64" : {
-                      "Fn::Join" : [ "", [
-                        "#cloud-boothook\n",
-                        "#!/bin/sh\n",
-                        "cd /etc/profile.d\n",
-                        "sudo touch custom.sh\n",
-                        "sudo echo export RDS_HOSTNAME=",{"Fn::GetAtt": ["RDS", "Endpoint.Address"]}," >> custom.sh\n",
-                        "sudo echo export RDS_USERNAME=csye6225master"," >> custom.sh\n",
-                        "sudo echo export RDS_PASSWORD=csye6225password"," >> custom.sh\n",
-                        "sudo echo export S3_BUCKET_ADDR=",{"Ref": "s3bucketName"}," >> custom.sh\n"
-                      ]
-                      ]
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#cloud-boothook\n",
+                                "#!/bin/sh\n",
+                                "cd /etc/profile.d\n",
+                                "sudo touch custom.sh\n",
+                                "sudo echo export RDS_HOSTNAME=",
+                                {
+                                    "Fn::GetAtt": [
+                                        "MyRDSDB",
+                                        "Endpoint.Address"
+                                    ]
+                                },
+                                " >> custom.sh\n",
+                                "sudo echo export RDS_USERNAME=dbuser",
+                                " >> custom.sh\n",
+                                "sudo echo export RDS_PASSWORD=dbpassword",
+                                " >> custom.sh\n",
+                                "sudo echo export S3_BUCKET_ADDR=",
+                                {
+                                    "Ref": "s3bucketName"
+                                },
+                                " >> custom.sh\n"
+                            ]
+                        ]
                     }
-                  }
+                }
             }
+        },
+        "EncryptedS3Bucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": {
+                    "Ref": "s3bucketName"
+                },
+                "LifecycleConfiguration": {
+                    "Rules": [
+                        {
+                            "Transitions": [
+                                {
+                                    "StorageClass": "STANDARD_IA",
+                                    "TransitionInDays": 30
+                                }
+                            ],
+                            "Status": "Enabled"
+                        }
+                    ]
+                },
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {
+                            "ServerSideEncryptionByDefault": {
+                                "SSEAlgorithm": "AES256"
+                            }
+                        }
+                    ]
+                }
+            },
+            "DeletionPolicy": "Delete"
         },
         "WebServerSecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
@@ -249,6 +298,12 @@
                         "IpProtocol": "tcp",
                         "FromPort": "443",
                         "ToPort": "443",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "3000",
+                        "ToPort": "3000",
                         "CidrIp": "0.0.0.0/0"
                     },
                     {
