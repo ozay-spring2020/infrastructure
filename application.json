@@ -356,7 +356,7 @@
                 "Path": "/",
                 "Roles": [
                     {
-                        "Ref": "EC2CSYE6225"
+                        "Ref": "CodeDeployEC2ServiceRole"
                     }
                 ]
             }
