@@ -317,7 +317,7 @@
             },
             "Export": {
                 "Name": {
-                    "Fn::Sub": "VPCName"
+                    "Fn::Sub": "VPC"
                 }
             }
         },

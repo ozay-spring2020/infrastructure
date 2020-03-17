@@ -109,6 +109,38 @@
                 }
             }
         },
+        "CloudWatchAgentServerPolicy ": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "cloudwatch:PutMetricData",
+                                "ec2:DescribeVolumes",
+                                "ec2:DescribeTags",
+                                "logs:PutLogEvents",
+                                "logs:DescribeLogStreams",
+                                "logs:DescribeLogGroups",
+                                "logs:CreateLogStream",
+                                "logs:CreateLogGroup"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ssm:GetParameter"
+                            ],
+                            "Resource": "arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*"
+                        }
+                    ]
+                },
+                "PolicyName": "CloudWatchAgentServerPolicy ",
+            }
+        },
         "CodeDeployEC2S3": {
             "Type": "AWS::IAM::Policy",
             "Properties": {
@@ -205,7 +237,8 @@
                 },
                 "PolicyName": "CircleCIUploadToS3",
                 "Users": [
-                    "cicd","circleci"
+                    "cicd",
+                    "circleci"
                 ]
             }
         },
@@ -260,7 +293,8 @@
                 },
                 "PolicyName": "CircleCI-Code-Deploy",
                 "Users": [
-                    "cicd","circleci"
+                    "cicd",
+                    "circleci"
                 ]
             }
         },
