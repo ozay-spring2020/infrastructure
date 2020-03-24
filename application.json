@@ -793,8 +793,33 @@
                         "ToPort": "443",
                         "CidrIp": "0.0.0.0/0"
                     }
-                  
                 ]
+            }
+        },
+        "DNSresourcerecord": {
+            "Type": "AWS::Route53::RecordSet",
+            "Properties": {
+                "AliasTarget": {
+                    "HostedZoneId": {
+                        "Fn::GetAtt": [
+                            "ApplicationLoadBalancer",
+                            "CanonicalHostedZoneID"
+                        ]
+                    },
+                    "DNSName": {
+                        "Fn::GetAtt": [
+                            "ApplicationLoadBalancer",
+                            "DNSName"
+                        ]
+                    }
+                },
+                "HostedZoneId": {
+                    "Ref": "hostedZoneID"
+                },
+                "Name": {
+                    "Ref": "domainName"
+                },
+                "Type": "A"
             }
         }
     }
