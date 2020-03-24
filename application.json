@@ -35,6 +35,16 @@
             "MinValue": "5",
             "MaxValue": "1024",
             "ConstraintDescription": "must be between 20 and 65536 GiB."
+        },
+        "certificateARN": {
+            "Type": "String"
+        },
+        "hostedZoneID": {
+            "Type": "String"
+        },
+        "domainName": {
+            "Description": "from email id",
+            "Type": "String"
         }
     },
     "Resources": {
@@ -109,7 +119,7 @@
                 }
             }
         },
-        "CloudWatchAgentServerPolicy ": {
+        "CloudWatchAgentServerPolicy": {
             "Type": "AWS::IAM::Policy",
             "Properties": {
                 "PolicyDocument": {
@@ -138,11 +148,10 @@
                         }
                     ]
                 },
-                "PolicyName": "CloudWatchAgentServerPolicy ",
+                "PolicyName": "CloudWatchAgentServerPolicy",
                 "Roles": [
                     {
                         "Ref": "CodeDeployEC2ServiceRole"
-                       
                     }
                 ]
             }
@@ -425,84 +434,6 @@
                 ]
             }
         },
-        "EC2Instance": {
-            "Type": "AWS::EC2::Instance",
-            "Properties": {
-                "ImageId": {
-                    "Ref": "AMI"
-                },
-                "IamInstanceProfile": {
-                    "Ref": "MyInstanceProfile"
-                },
-                "NetworkInterfaces": [
-                    {
-                        "AssociatePublicIpAddress": "true",
-                        "DeviceIndex": "0",
-                        "GroupSet": [
-                            {
-                                "Ref": "WebServerSecurityGroup"
-                            }
-                        ],
-                        "SubnetId": {
-                            "Fn::ImportValue": {
-                                "Fn::Sub": "${VPCName}-subnet-A"
-                            }
-                        }
-                    }
-                ],
-                "Tags": [
-                    {
-                        "Key": "Name",
-                        "Value": "EC2-Server"
-                    }
-                ],
-                "InstanceType": "t2.micro",
-                "DisableApiTermination": false,
-                "BlockDeviceMappings": [
-                    {
-                        "DeviceName": "/dev/sda1",
-                        "Ebs": {
-                            "VolumeType": "gp2",
-                            "DeleteOnTermination": true,
-                            "VolumeSize": {
-                                "Ref": "EC2Size"
-                            }
-                        }
-                    }
-                ],
-                "KeyName": "csye6225",
-                "UserData": {
-                    "Fn::Base64": {
-                        "Fn::Join": [
-                            "",
-                            [
-                                "#cloud-boothook\n",
-                                "#!/bin/sh\n",
-                                "cd /etc/profile.d\n",
-                                "sudo touch custom.sh\n",
-                                "sudo echo export RDS_HOSTNAME=",
-                                {
-                                    "Fn::GetAtt": [
-                                        "MyRDSDB",
-                                        "Endpoint.Address"
-                                    ]
-                                },
-                                " >> custom.sh\n",
-                                "sudo echo export RDS_USERNAME=dbuser",
-                                " >> custom.sh\n",
-                                "sudo echo export RDS_PASSWORD=dbpassword",
-                                " >> custom.sh\n",
-                                "sudo echo export S3_BUCKET_ADDR=",
-                                {
-                                    "Ref": "s3bucketName"
-                                },
-                                " >> custom.sh\n"
-                            ]
-                        ]
-                    }
-                }
-            }
-        },
         "EncryptedS3Bucket": {
             "Type": "AWS::S3::Bucket",
             "Properties": {
@@ -598,6 +529,272 @@
                         "Fn::Sub": "VPC"
                     }
                 }
+            }
+        },
+        "MyLaunchConfig": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "LaunchConfigurationName": "asg_launch_config",
+                "InstanceType": "t2.micro",
+                "PlacementTenancy": "default",
+                "ImageId": {
+                    "Ref": "AMI"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "MyInstanceProfile"
+                },
+                "SecurityGroups": [
+                    {
+                        "Ref": "WebServerSecurityGroup"
+                    }
+                ],
+                "AssociatePublicIpAddress": true,
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeSize": "20",
+                            "VolumeType": "gp2",
+                            "DeleteOnTermination": true
+                        }
+                    }
+                ],
+                "KeyName": "csye6225",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#cloud-boothook\n",
+                                "#!/bin/sh\n",
+                                "cd /etc/profile.d\n",
+                                "sudo touch custom.sh\n",
+                                "sudo echo export RDS_HOSTNAME=",
+                                {
+                                    "Fn::GetAtt": [
+                                        "MyRDSDB",
+                                        "Endpoint.Address"
+                                    ]
+                                },
+                                " >> custom.sh\n",
+                                "sudo echo export RDS_USERNAME=dbuser",
+                                " >> custom.sh\n",
+                                "sudo echo export RDS_PASSWORD=dbpassword",
+                                " >> custom.sh\n",
+                                "sudo echo export S3_BUCKET_ADDR=",
+                                {
+                                    "Ref": "s3bucketName"
+                                },
+                                " >> custom.sh\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "WebServerGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "AutoScalingGroupName": "AutoScalingGroup",
+                "Cooldown": "60",
+                "DesiredCapacity": "3",
+                "LaunchConfigurationName": {
+                    "Ref": "MyLaunchConfig"
+                },
+                "VPCZoneIdentifier": [
+                    {
+                        "Fn::ImportValue": {
+                            "Fn::Sub": "${VPCName}-subnet-A"
+                        }
+                    },
+                    {
+                        "Fn::ImportValue": {
+                            "Fn::Sub": "${VPCName}-subnet-B"
+                        }
+                    }
+                ],
+                "MaxSize": "10",
+                "MinSize": "3",
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "ALBTargetGroup"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "EC2-Server",
+                        "PropagateAtLaunch": true
+                    }
+                ]
+            }
+        },
+        "WebServerScaleUpPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "WebServerGroup"
+                },
+                "Cooldown": "60",
+                "ScalingAdjustment": "1"
+            }
+        },
+        "WebServerScaleDownPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "WebServerGroup"
+                },
+                "Cooldown": "60",
+                "ScalingAdjustment": "-1"
+            }
+        },
+        "CPUAlarmHigh": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-up if CPU > 90% for 10 minutes",
+                "MetricName": "CPUUtilization",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "2",
+                "Threshold": "5",
+                "AlarmActions": [
+                    {
+                        "Ref": "WebServerScaleUpPolicy"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "WebServerGroup"
+                        }
+                    }
+                ],
+                "ComparisonOperator": "GreaterThanThreshold"
+            }
+        },
+        "CPUAlarmLow": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+                "MetricName": "CPUUtilization",
+                "Namespace": "AWS/EC2",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "2",
+                "Threshold": "3",
+                "AlarmActions": [
+                    {
+                        "Ref": "WebServerScaleDownPolicy"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "WebServerGroup"
+                        }
+                    }
+                ],
+                "ComparisonOperator": "LessThanThreshold"
+            }
+        },
+        "ApplicationLoadBalancer": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": "ApplicationLoadBalancer",
+                "Subnets": [
+                    {
+                        "Fn::ImportValue": {
+                            "Fn::Sub": "${VPCName}-subnet-A"
+                        }
+                    },
+                    {
+                        "Fn::ImportValue": {
+                            "Fn::Sub": "${VPCName}-subnet-B"
+                        }
+                    }
+                ],
+                "Scheme": "internet-facing",
+                "Type": "application",
+                "SecurityGroups": [
+                    {
+                        "Ref": "LoadBalancerSecurityGroup"
+                    }
+                ],
+                "IpAddressType": "ipv4"
+            }
+        },
+        "ALBListenerService": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ALBTargetGroup"
+                        }
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "ApplicationLoadBalancer"
+                },
+                "Port": "443",
+                "Protocol": "HTTPS",
+                "Certificates": [
+                    {
+                        "CertificateArn": {
+                            "Ref": "certificateARN"
+                        }
+                    }
+                ]
+            }
+        },
+        "ALBTargetGroup": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "HealthCheckIntervalSeconds": 30,
+                "HealthCheckPath": "/",
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckTimeoutSeconds": 7,
+                "Name": "ALBTargetGroup",
+                "Port": 3000,
+                "Protocol": "HTTP",
+                "TargetType": "instance",
+                "UnhealthyThresholdCount": 5,
+                "VpcId": {
+                    "Fn::ImportValue": {
+                        "Fn::Sub": "VPC"
+                    }
+                },
+                "Matcher": {
+                    "HttpCode": "200,302,401"
+                }
+            }
+        },
+        "LoadBalancerSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Access to ports 22, 80 & 443",
+                "GroupName": "LoadBalancerSecurityGroup",
+                "VpcId": {
+                    "Fn::ImportValue": {
+                        "Fn::Sub": "VPC"
+                    }
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "443",
+                        "ToPort": "443",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                  
+                ]
             }
         }
     }
