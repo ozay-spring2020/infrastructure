@@ -743,8 +743,8 @@
                 "LoadBalancerArn": {
                     "Ref": "ApplicationLoadBalancer"
                 },
-                "Port": "443",
-                "Protocol": "HTTPS",
+                "Port": "80",
+                "Protocol": "HTTP",
                 "Certificates": [
                     {
                         "CertificateArn": {
