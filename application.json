@@ -45,6 +45,11 @@
         "domainName": {
             "Description": "from email id",
             "Type": "String"
+        },
+        "mySNSTopicName": {
+            "Default": "reset_password",
+            "Description": "SNS Topic name",
+            "Type": "String"
         }
     },
     "Resources": {
@@ -337,25 +342,28 @@
         "CodeDeployServiceRole": {
             "Type": "AWS::IAM::Role",
             "Properties": {
+                "RoleName": "CodeDeployServiceRole",
+                "Path": "/",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole",
+                    "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambda"
+                ],
                 "AssumeRolePolicyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Sid": "CodeDeployServiceRole",
                             "Effect": "Allow",
                             "Principal": {
                                 "Service": [
                                     "codedeploy.amazonaws.com"
                                 ]
                             },
-                            "Action": "sts:AssumeRole"
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
                         }
                     ]
-                },
-                "ManagedPolicyArns": [
-                    "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
-                ],
-                "RoleName": "CodeDeployServiceRole"
+                }
             }
         },
         "CodeDeployApplication": {
@@ -819,6 +827,243 @@
                     "Ref": "domainName"
                 },
                 "Type": "A"
+            }
+        },
+        "RolePoliciesLmabda": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "ManagedPolicyName": "LmbdaCodeDeploy-S3",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject",
+                                "s3:PutObject",
+                                "s3:DeleteObject"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Sub": [
+                                        "arn:aws:s3:::${bucketName}/*",
+                                        {
+                                            "bucketName": {
+                                                "Ref": "CodeDeployS3Bucket"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "LambdaExecutionRole"
+                    }
+                ]
+            }
+        },
+        "SNSPolicy": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "Description": "This policy allows EC2 to access SNS",
+                "Path": "/",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "SNS:*"
+                            ],
+                            "Resource": [
+                                "*"
+                            ]
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "CodeDeployEC2ServiceRole"
+                    }
+                ],
+                "ManagedPolicyName": "SNSPolicy"
+            },
+            "DependsOn": "CodeDeployEC2ServiceRole"
+        },
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRole"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                },
+                "Path": "/",
+                "RoleName": "LambdaExecutionRole",
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                    "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+                    "arn:aws:iam::aws:policy/AmazonSESFullAccess",
+                    "arn:aws:iam::aws:policy/CloudWatchFullAccess"
+                ]
+            }
+        },
+        "LambdaExecutionCircleCI": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "ManagedPolicyName": "LambdaExecutionCircleCI",
+                "Description": "Upload to S3",
+                "Path": "/",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "ConfigureFunctions",
+                            "Effect": "Allow",
+                            "Action": [
+                                "lambda:CreateFunction",
+                                "lambda:UpdateFunctionConfiguration",
+                                "lambda:UpdateFunctionCode"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Users": [
+                    "circleci"
+                ]
+            }
+        },
+        "MyLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "FunctionName": "MyLambdaFunction",
+                "Handler": "index.handler",
+                "Code": {
+                    "ZipFile": "exports.handler = (event, context, callback) => {\n    callback(null, \"Hello World!\");\n};\n"
+                },
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Description": "lambda to host webapp",
+                "Environment": {
+                    "Variables": {
+                        "DOMAIN_NAME": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "domainName"
+                                    }
+                                ]
+                            ]
+                        },
+                        "FROM_EMAIL": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    "no-reply@test.",
+                                    {
+                                        "Ref": "domainName"
+                                    }
+                                ]
+                            ]
+                        },
+                        "TABLENAME": "csye6225",
+                        "TTL": "15"
+                    }
+                },
+                "ReservedConcurrentExecutions": 5,
+                "Runtime": "nodejs10.x",
+                "Timeout": 100,
+                "MemorySize": 256
+            }
+        },
+        "MySNS": {
+            "Type": "AWS::SNS::Topic",
+            "DependsOn": "MyLambdaFunction",
+            "Properties": {
+                "TopicName": {
+                    "Ref": "mySNSTopicName"
+                },
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Fn::GetAtt": [
+                                "MyLambdaFunction",
+                                "Arn"
+                            ]
+                        },
+                        "Protocol": "lambda"
+                    }
+                ],
+                "DisplayName": "MySNS"
+            }
+        },
+        "LambdaResourcePolicy": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "MyLambdaFunction",
+                        "Arn"
+                    ]
+                },
+                "Principal": "sns.amazonaws.com",
+                "Action": "lambda:InvokeFunction",
+                "SourceArn": {
+                    "Ref": "MySNS"
+                }
+            }
+        },
+        "MyQueue": {
+            "Type": "AWS::SQS::Queue",
+            "Properties": {
+                "QueueName": "SampleQueue"
+            }
+        },
+        "AWSdynamotable": {
+            "Type": "AWS::DynamoDB::Table",
+            "DeletionPolicy": "Delete",
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": "id",
+                        "AttributeType": "S"
+                    }
+                ],
+                "TableName": "csye6225",
+                "KeySchema": [
+                    {
+                        "AttributeName": "id",
+                        "KeyType": "HASH"
+                    }
+                ],
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": 5,
+                    "WriteCapacityUnits": 5
+                },
+                "TimeToLiveSpecification": {
+                    "AttributeName": "TTL",
+                    "Enabled": true
+                }
             }
         }
     }
