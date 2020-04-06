@@ -751,8 +751,15 @@
                 "LoadBalancerArn": {
                     "Ref": "ApplicationLoadBalancer"
                 },
-                "Port": "80",
-                "Protocol": "HTTP"
+                "Port": "443",
+                "Protocol": "HTTPS",
+                "Certificates": [
+                    {
+                        "CertificateArn": {
+                            "Ref": "certificateARN"
+                        }
+                    }
+                ]
             }
         },
         "ALBTargetGroup": {
