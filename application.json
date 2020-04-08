@@ -71,12 +71,25 @@
                 "DBSubnetGroupName": {
                     "Ref": "dbSubnetGroup"
                 },
+				"DBParameterGroupName":{
+				    "Ref": "RDSDBParameterGroup"
+				},
                 "PubliclyAccessible": true,
                 "VPCSecurityGroups": [
                     {
                         "Ref": "DBSecurityGroup"
                     }
                 ]
+            }
+        },
+        "RDSDBParameterGroup": {
+            "Type": "AWS::RDS::DBParameterGroup",
+            "Properties": {
+                "Description": "CloudFormation Sample Database Parameter Group",
+                "Family": "mysql5.7",
+                "Parameters": {
+                    "performance_schema": "1"
+                }
             }
         },
         "WebAppS3": {
